@@ -1,17 +1,1 @@
-// Expedição VUC — funciona offline depois da primeira abertura.
-const CACHE='expedicao-vuc-v3';
-const FILES=['./','./index.html','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/icon-maskable-512.png',
- './ocr/tesseract.min.js','./ocr/worker.min.js','./ocr/core/tesseract-core-lstm.wasm.js','./ocr/core/tesseract-core-simd-lstm.wasm.js','./ocr/lang/eng.traineddata.gz'];
-self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()))});
-self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
-self.addEventListener('fetch',e=>{
- if(e.request.method!=='GET')return;
- const url=new URL(e.request.url);
- if(url.origin!==location.origin)return;
- // Página: tenta a versão nova na internet; sem internet usa a salva.
- if(e.request.mode==='navigate'){
-  e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(CACHE).then(k=>k.put('./index.html',c));return r}).catch(()=>caches.match('./index.html')));
-  return;
- }
- e.respondWith(caches.match(e.request,{ignoreSearch:true}).then(r=>r||fetch(e.request).then(res=>{if(res.ok){const c=res.clone();caches.open(CACHE).then(k=>k.put(e.request,c))}return res})));
-});
+if(!self.define){let e,n={};const r=(r,i)=>(r=new URL(r+".js",i).href,n[r]||new Promise(n=>{if("document"in self){const e=document.createElement("script");e.src=r,e.onload=n,document.head.appendChild(e)}else e=r,importScripts(r),n()}).then(()=>{let e=n[r];if(!e)throw new Error(`Module ${r} didn’t register its module`);return e}));self.define=(i,s)=>{const o=e||("document"in self?document.currentScript.src:"")||location.href;if(n[o])return;let l={};const t=e=>r(e,o),c={module:{uri:o},exports:l,require:t};n[o]=Promise.all(i.map(e=>c[e]||t(e))).then(e=>(s(...e),l))}}define(["./workbox-9c191d2f"],function(e){"use strict";self.skipWaiting(),e.clientsClaim(),e.precacheAndRoute([{url:"index.html",revision:null},{url:"ocr/worker.min.js",revision:null},{url:"ocr/tesseract.min.js",revision:null},{url:"ocr/lang/eng.traineddata.gz",revision:null},{url:"ocr/core/tesseract-core-simd-lstm.wasm.js",revision:null},{url:"ocr/core/tesseract-core-lstm.wasm.js",revision:null},{url:"icons/icon-maskable-512.png",revision:null},{url:"icons/icon-512.png",revision:null},{url:"icons/icon-192.png",revision:null},{url:"manifest.webmanifest",revision:"d166a90b0cbd9352a8f559234c53c7cf"}],{}),e.cleanupOutdatedCaches(),e.registerRoute(new e.NavigationRoute(e.createHandlerBoundToURL("index.html")))});
