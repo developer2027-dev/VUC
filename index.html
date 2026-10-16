@@ -484,7 +484,17 @@ makePanel();
 
 function editFooter(section){openVucModal('footerModal');const id=section==='customs'?'customsInput':section==='leaders5'?'leader5Input':'leader4Input';const el=$(id);if(el)el.focus()}
 let recognizedRoutes=[];
-async function loadTesseract(){if(window.Tesseract)return;await new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='ocr/tesseract.min.js';script.onload=resolve;script.onerror=()=>reject(Error('Não foi possível carregar a leitura de foto.'));document.head.appendChild(script)})}
+let ocrLocal=location.protocol!=='file:';
+function loadScriptSrc(src){return new Promise((resolve,reject)=>{const sc=document.createElement('script');sc.src=src;sc.onload=resolve;sc.onerror=()=>{sc.remove();reject(Error('falhou: '+src))};document.head.appendChild(sc)})}
+async function loadTesseract(){if(window.Tesseract)return;
+ // 1º tenta os arquivos da pasta ocr (funciona offline); se não tiver, baixa da internet
+ if(ocrLocal){try{await loadScriptSrc('ocr/tesseract.min.js');return}catch(e){ocrLocal=false}}
+ try{await loadScriptSrc('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js')}
+ catch(e){throw Error('Sem internet e sem a pasta ocr do app. Conecte à internet ou cole as rotas em texto.')}}
+async function makeOcrWorker(){
+ if(ocrLocal){try{return await Tesseract.createWorker('eng',1,{workerPath:new URL('ocr/worker.min.js',location.href).href,corePath:new URL('ocr/core/',location.href).href,langPath:new URL('ocr/lang',location.href).href,gzip:true,cacheMethod:'none'})}catch(e){ocrLocal=false}}
+ try{return await Tesseract.createWorker('eng',1,{workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1/',langPath:'https://cdn.jsdelivr.net/npm/@tesseract.js-data/eng@1.0.0/4.0.0_best_int',gzip:true})}
+ catch(e){throw Error('Não consegui baixar o leitor de foto. Confira a internet ou cole as rotas em texto.')}}
 async function upscalePhoto(file){const bitmap=await createImageBitmap(file);const factor=Math.min(4,Math.max(2,1800/bitmap.width));const c=document.createElement('canvas');c.width=Math.round(bitmap.width*factor);c.height=Math.round(bitmap.height*factor);const ctx=c.getContext('2d',{willReadFrequently:true});ctx.fillStyle='white';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(bitmap,0,0,c.width,c.height);const im=ctx.getImageData(0,0,c.width,c.height);for(let i=0;i<im.data.length;i+=4){const r=im.data[i],g=im.data[i+1],b=im.data[i+2];const gray=.299*r+.587*g+.114*b;const v=gray<170?0:255;im.data[i]=im.data[i+1]=im.data[i+2]=v}ctx.putImageData(im,0,0);bitmap.close();return c}
 function routeCarrier(raw){const t=raw.toUpperCase().replace(/[^A-Z]/g,'');if(/ONTIME/.test(t))return 'OT';if(/DECARGO/.test(t))return 'DC';if(/ECOEXPRESS/.test(t))return 'EC';if(/HAWK/.test(t))return 'HW';if(/PARCEIRO/.test(t))return 'PC';if(/COOPMETRO/.test(t))return 'CM';return ''}
 function parsePhotoRoutes(text){
@@ -522,7 +532,7 @@ function parseAndSuggestRouteText(){
  $('routes').value='GAIOLA\tMLP\tONDA\n'+recognizedRoutes.map(r=>r.route+'\t'+(names[r.mlp]||'CONFERIR')+'\t'+$('wave').value).join('\n');
  showRouteMatch();applyPhotoRoutes();
 }
-async function readRoutePhoto(){const file=$('routePhoto').files[0],status=$('routeOCRStatus'),btn=$('readPhotoBtn');if(!file){status.textContent='Selecione o print da planilha.';return}btn.disabled=true;status.textContent='Preparando imagem...';try{await loadTesseract();const canvas=await upscalePhoto(file);status.textContent='Reconhecendo as rotas...';const worker=await Tesseract.createWorker('eng',1,{workerPath:new URL('ocr/worker.min.js',location.href).href,corePath:new URL('ocr/core/',location.href).href,langPath:new URL('ocr/lang',location.href).href,gzip:true,cacheMethod:'none'});let text='';try{await worker.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1'});const result=await worker.recognize(canvas);text=result.data.text}finally{await worker.terminate()}$('routeRawText').value=text;parseAndSuggestRouteText();if(!recognizedRoutes.length){status.textContent='Não consegui ler todas as rotas. Confira o texto extraído ou cole a tabela no campo abaixo.'}}catch(e){status.textContent='Falha na leitura: '+e.message}finally{btn.disabled=false}}
+async function readRoutePhoto(){const file=$('routePhoto').files[0],status=$('routeOCRStatus'),btn=$('readPhotoBtn');if(!file){status.textContent='Selecione o print da planilha.';return}btn.disabled=true;status.textContent='Preparando imagem...';try{await loadTesseract();const canvas=await upscalePhoto(file);status.textContent='Reconhecendo as rotas...';const worker=await makeOcrWorker();let text='';try{await worker.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1'});const result=await worker.recognize(canvas);text=result.data.text}finally{await worker.terminate()}$('routeRawText').value=text;parseAndSuggestRouteText();if(!recognizedRoutes.length){status.textContent='Não consegui ler todas as rotas. Confira o texto extraído ou cole a tabela no campo abaixo.'}}catch(e){status.textContent='Falha na leitura: '+e.message}finally{btn.disabled=false}}
 
 function loadReferenceRoutes(){
  const rows=[['VG13_PM1','PC'],['VG1_PM1','CM'],['VH14_PM1','EC'],['VG12_PM1','PC'],['VG4_PM1','EC'],['VG3_PM1','OT'],['VI1_PM1','HW'],['VH8_PM1','PC'],['VH7_PM1','OT'],['VH5_PM1','PC'],['VH1_PM1','HW'],['VH3_PM1','EC'],['VG9_PM1','EC'],['VG6_PM1','CM'],['VH2_PM1','OT'],['VG5_PM1','OT'],['VG2_PM1','HW'],['VG8_PM1','HW'],['VG16_PM1','DC']];

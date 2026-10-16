@@ -1,5 +1,5 @@
 // Expedição VUC — funciona offline depois da primeira abertura.
-const CACHE='expedicao-vuc-v2';
+const CACHE='expedicao-vuc-v3';
 const FILES=['./','./index.html','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/icon-maskable-512.png',
  './ocr/tesseract.min.js','./ocr/worker.min.js','./ocr/core/tesseract-core-lstm.wasm.js','./ocr/core/tesseract-core-simd-lstm.wasm.js','./ocr/lang/eng.traineddata.gz'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()))});
