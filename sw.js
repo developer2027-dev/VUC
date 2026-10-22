@@ -1,1 +1,40 @@
-if(!self.define){let e,n={};const r=(r,i)=>(r=new URL(r+".js",i).href,n[r]||new Promise(n=>{if("document"in self){const e=document.createElement("script");e.src=r,e.onload=n,document.head.appendChild(e)}else e=r,importScripts(r),n()}).then(()=>{let e=n[r];if(!e)throw new Error(`Module ${r} didn’t register its module`);return e}));self.define=(i,s)=>{const o=e||("document"in self?document.currentScript.src:"")||location.href;if(n[o])return;let l={};const t=e=>r(e,o),c={module:{uri:o},exports:l,require:t};n[o]=Promise.all(i.map(e=>c[e]||t(e))).then(e=>(s(...e),l))}}define(["./workbox-9c191d2f"],function(e){"use strict";self.skipWaiting(),e.clientsClaim(),e.precacheAndRoute([{url:"index.html",revision:null},{url:"ocr/worker.min.js",revision:null},{url:"ocr/tesseract.min.js",revision:null},{url:"ocr/lang/eng.traineddata.gz",revision:null},{url:"ocr/core/tesseract-core-simd-lstm.wasm.js",revision:null},{url:"ocr/core/tesseract-core-lstm.wasm.js",revision:null},{url:"icons/icon-maskable-512.png",revision:null},{url:"icons/icon-512.png",revision:null},{url:"icons/icon-192.png",revision:null},{url:"manifest.webmanifest",revision:"d166a90b0cbd9352a8f559234c53c7cf"}],{}),e.cleanupOutdatedCaches(),e.registerRoute(new e.NavigationRoute(e.createHandlerBoundToURL("index.html")))});
+// Report VUC — service worker simples (v2026-10-21b)
+// Com internet: sempre busca a versão mais nova do GitHub.
+// Sem internet: usa a última cópia salva no celular.
+const CACHE = 'report-vuc-v2';
+
+self.addEventListener('install', () => self.skipWaiting());
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    // apaga os caches antigos (inclusive o "precache" que travava a versão velha)
+    for (const k of await caches.keys()) if (k !== CACHE) await caches.delete(k);
+    await self.clients.claim();
+  })());
+});
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  const sameOrigin = url.origin === self.location.origin;
+  const cdn = url.hostname === 'cdn.jsdelivr.net';
+  if (!sameOrigin && !cdn) return;
+
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    try {
+      const fresh = await fetch(req, sameOrigin ? { cache: 'no-cache' } : undefined);
+      if (fresh && (fresh.ok || fresh.type === 'opaque')) cache.put(req, fresh.clone()).catch(() => {});
+      return fresh;
+    } catch (err) {
+      const hit = await cache.match(req, { ignoreSearch: req.mode === 'navigate' });
+      if (hit) return hit;
+      if (req.mode === 'navigate') {
+        const home = await cache.match('./') || await cache.match('./index.html');
+        if (home) return home;
+      }
+      throw err;
+    }
+  })());
+});
